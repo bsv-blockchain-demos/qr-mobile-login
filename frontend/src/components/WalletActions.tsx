@@ -1,9 +1,9 @@
-import type { SessionInfo } from '@bsv/wallet-relay/client'
 import type { WalletMethod } from '../types/wallet'
 
 interface Props {
-  session: SessionInfo | null
+  connected: boolean
   onRequest: (method: WalletMethod, params?: unknown) => void
+  signingHint?: string
 }
 
 const OP_NOP_LOCKING_SCRIPT = '61'
@@ -125,17 +125,15 @@ function ActionIcon({ type }: Readonly<{ type: ActionDef['icon'] }>) {
   }
 }
 
-export function WalletActions({ session, onRequest }: Readonly<Props>) {
-  const connected = session?.status === 'connected'
+export function WalletActions({ connected, onRequest, signingHint }: Readonly<Props>) {
+  const hint = signingHint ?? (connected ? 'Requests are signed on your phone' : 'Pair first to unlock actions')
 
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-ink">Wallet Actions</h2>
-          <p className="text-xs text-ink-tertiary mt-0.5">
-            {connected ? 'Requests are signed on your phone' : 'Pair first to unlock actions'}
-          </p>
+          <p className="text-xs text-ink-tertiary mt-0.5">{hint}</p>
         </div>
         {!connected && (
           <span className="text-[10px] font-medium uppercase tracking-wider text-ink-muted px-2 py-1 rounded bg-surface-inset">

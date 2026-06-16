@@ -1,14 +1,32 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { WalletClient } from '@bsv/sdk'
 import { WalletConnectionModal } from '../components/WalletConnectionModal'
 import { QRDisplay }             from '../components/QRDisplay'
 import { WalletActions }         from '../components/WalletActions'
 import { RequestLog }            from '../components/RequestLog'
 import { useWalletSession }      from '../hooks/useWalletSession'
+import { useLocalWallet }        from '../hooks/useLocalWallet'
 import { StatusBadge }           from '../components/ui/StatusBadge'
 import { StepProgress }          from '../components/ui/StepProgress'
 
 type WalletMode = 'detecting' | 'local' | 'mobile'
+
+function ErrorBanner({ error }: Readonly<{ error: string }>) {
+  return (
+    <div
+      role="alert"
+      className="mb-6 flex items-start gap-3 px-4 py-3.5 rounded-xl bg-error-muted border border-error/25 text-sm animate-fade-up"
+    >
+      <svg className="w-5 h-5 text-error shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+      </svg>
+      <div>
+        <p className="font-medium text-error">Connection error</p>
+        <p className="text-ink-secondary mt-0.5">{error}</p>
+      </div>
+    </div>
+  )
+}
 
 function AppHeader({ mode, sessionStatus }: Readonly<{ mode: WalletMode; sessionStatus?: string }>) {
   const badgeStatus =
@@ -17,6 +35,11 @@ function AppHeader({ mode, sessionStatus }: Readonly<{ mode: WalletMode; session
       : mode === 'local'
         ? 'connected' as const
         : (sessionStatus ?? 'pending') as 'pending' | 'connected' | 'disconnected' | 'expired'
+
+  const subtitle =
+    mode === 'local'
+      ? 'Local browser wallet'
+      : 'Encrypted mobile wallet pairing'
 
   return (
     <header className="border-b border-border-soft bg-surface/60 backdrop-blur-sm sticky top-0 z-40">
@@ -29,12 +52,52 @@ function AppHeader({ mode, sessionStatus }: Readonly<{ mode: WalletMode; session
           </div>
           <div className="min-w-0">
             <h1 className="text-base font-semibold text-ink truncate">BSV Remote Signer</h1>
-            <p className="text-xs text-ink-tertiary hidden sm:block">Encrypted mobile wallet pairing</p>
+            <p className="text-xs text-ink-tertiary hidden sm:block">{subtitle}</p>
           </div>
         </div>
         <StatusBadge status={badgeStatus} />
       </div>
     </header>
+  )
+}
+
+interface WalletWorkspaceProps {
+  error: string | null
+  log: ReturnType<typeof useWalletSession>['log']
+  connected: boolean
+  signingHint: string
+  onRequest: (method: Parameters<ReturnType<typeof useWalletSession>['sendRequest']>[0], params?: unknown) => void
+  leftPanel: ReactNode
+}
+
+function WalletWorkspace({ error, log, connected, signingHint, onRequest, leftPanel }: Readonly<WalletWorkspaceProps>) {
+  return (
+    <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-10">
+      <div className="mb-8 sm:mb-10 animate-fade-up">
+        <StepProgress current="authorize" />
+      </div>
+
+      {error && <ErrorBanner error={error} />}
+
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] gap-6 lg:gap-8">
+        <section
+          className="rounded-2xl border border-border bg-surface p-6 sm:p-8 flex flex-col items-center justify-center
+                     min-h-[420px] animate-fade-up-delay-1"
+        >
+          {leftPanel}
+        </section>
+
+        <div className="flex flex-col gap-6 animate-fade-up-delay-2">
+          <section className="rounded-2xl border border-border bg-surface p-6 sm:p-8">
+            <WalletActions connected={connected} onRequest={onRequest} signingHint={signingHint} />
+          </section>
+
+          <section className="rounded-2xl border border-border bg-surface p-6 sm:p-8">
+            <RequestLog entries={log} />
+          </section>
+        </div>
+      </div>
+    </main>
   )
 }
 
@@ -65,20 +128,7 @@ function MobileQRContent() {
           <StepProgress current={currentStep} />
         </div>
 
-        {error && (
-          <div
-            role="alert"
-            className="mb-6 flex items-start gap-3 px-4 py-3.5 rounded-xl bg-error-muted border border-error/25 text-sm animate-fade-up"
-          >
-            <svg className="w-5 h-5 text-error shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-            </svg>
-            <div>
-              <p className="font-medium text-error">Connection error</p>
-              <p className="text-ink-secondary mt-0.5">{error}</p>
-            </div>
-          </div>
-        )}
+        {error && <ErrorBanner error={error} />}
 
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] gap-6 lg:gap-8">
           <section
@@ -106,7 +156,11 @@ function MobileQRContent() {
 
           <div className="flex flex-col gap-6 animate-fade-up-delay-2">
             <section className="rounded-2xl border border-border bg-surface p-6 sm:p-8">
-              <WalletActions session={session} onRequest={sendRequest} />
+              <WalletActions
+                connected={connected}
+                onRequest={sendRequest}
+                signingHint={connected ? 'Requests are signed on your phone' : 'Pair first to unlock actions'}
+              />
             </section>
 
             <section className="rounded-2xl border border-border bg-surface p-6 sm:p-8">
@@ -119,41 +173,62 @@ function MobileQRContent() {
   )
 }
 
-function LocalWalletView() {
+function LocalWalletPanel() {
+  return (
+    <div className="w-full max-w-sm flex flex-col items-center gap-6 animate-fade-up">
+      <div className="relative">
+        <div className="w-20 h-20 rounded-2xl bg-success-muted flex items-center justify-center ring-1 ring-success/20">
+          <svg className="w-10 h-10 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" />
+          </svg>
+        </div>
+        <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-success flex items-center justify-center ring-2 ring-canvas">
+          <svg className="w-3.5 h-3.5 text-canvas" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        </span>
+      </div>
+
+      <div className="text-center space-y-2">
+        <StatusBadge status="connected" />
+        <h2 className="text-lg font-semibold text-ink">Local wallet ready</h2>
+        <p className="text-sm text-ink-secondary max-w-xs text-balance leading-relaxed">
+          A BSV wallet extension was detected in this browser. Requests are signed locally — no QR pairing needed.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function LocalWalletView({ wallet }: Readonly<{ wallet: WalletClient }>) {
+  const { log, error, sendRequest } = useLocalWallet(wallet)
+
   return (
     <div className="min-h-screen bg-canvas flex flex-col">
       <AppHeader mode="local" />
-
-      <main className="flex-1 flex items-center justify-center p-6">
-        <div className="text-center max-w-sm animate-fade-up">
-          <div className="relative inline-block mb-6">
-            <div className="w-20 h-20 rounded-2xl bg-success-muted flex items-center justify-center ring-1 ring-success/20">
-              <svg className="w-10 h-10 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" />
-              </svg>
-            </div>
-            <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-success flex items-center justify-center ring-2 ring-canvas">
-              <svg className="w-3.5 h-3.5 text-canvas" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            </span>
+      <WalletWorkspace
+        error={error}
+        log={log}
+        connected
+        signingHint="Requests are signed by your local wallet"
+        onRequest={sendRequest}
+        leftPanel={
+          <div className="w-full max-w-sm">
+            <LocalWalletPanel />
           </div>
-          <h2 className="text-xl font-semibold text-ink mb-2">Local wallet connected</h2>
-          <p className="text-sm text-ink-secondary leading-relaxed">
-            A BSV wallet extension was detected on this browser. You&apos;re ready to sign without mobile pairing.
-          </p>
-        </div>
-      </main>
+        }
+      />
     </div>
   )
 }
 
 export function DesktopView() {
   const [mode, setMode] = useState<WalletMode>('detecting')
+  const [localWallet, setLocalWallet] = useState<WalletClient | null>(null)
 
   const handleLocalWallet = useCallback((wallet: WalletClient) => {
+    setLocalWallet(wallet)
     setMode('local')
-    console.log('[DesktopView] local wallet connected', wallet)
   }, [])
 
   const handleMobileQR = useCallback(() => {
@@ -169,7 +244,7 @@ export function DesktopView() {
         />
       )}
 
-      {mode === 'local' && <LocalWalletView />}
+      {mode === 'local' && localWallet && <LocalWalletView wallet={localWallet} />}
       {mode === 'mobile' && <MobileQRContent />}
     </>
   )
