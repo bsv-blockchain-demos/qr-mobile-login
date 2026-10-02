@@ -72,3 +72,7 @@ No application test script is defined. The repository's development checks also 
 - [Backend entry point](../backend/src/index.ts): session routes and relay service configuration.
 
 Older architecture notes describe service classes and a mobile app tree that are no longer present in this checkout. Use the current entry points above when tracing behaviour.
+
+## Licence
+
+This frontend's [package.json](package.json) has no licence declaration. The backend declares the **ISC licence**; see the [repository licence section](../README.md#licence) for the recorded declarations. No standalone licence file is included in this repository.

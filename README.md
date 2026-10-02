@@ -62,3 +62,7 @@ The frontend's `npm run build` currently fails in `DesktopView.tsx` because the 
 Run `npx tsc --noEmit` in both components as a development check. The frontend production build performs an additional project-reference check. No automated test scripts are defined.
 
 Production hosting must provide HTTP API and WebSocket routing; Vite's development proxy is not included in the static build. The current session routes and relay library are the source of truth for the architecture; older notes describe service classes and mobile application files that are absent from this checkout.
+
+## Licence
+
+**Backend licence declaration: ISC.** See [backend/package.json](backend/package.json). The [root](package.json) and [frontend](frontend/package.json) package manifests have no licence declaration. No standalone licence file is included in this repository.
